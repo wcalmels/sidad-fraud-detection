@@ -50,11 +50,29 @@ def _register():
     import urllib.request
     time.sleep(5)  # wait for server to start
     try:
-        my_url = os.environ.get("RAILWAY_PUBLIC_DOMAIN","")
-        if my_url:
+        # FIX: RAILWAY_PUBLIC_DOMAIN no siempre esta seteada por default --
+        # probar varias variables que Railway puede exponer segun el plan/
+        # configuracion, antes de caer a localhost (inutil fuera del propio
+        # contenedor, y es lo que estaba pasando: el agente se registraba
+        # con url=localhost:8080 y el Meta-Orquestador nunca podia
+        # consultar su /health real).
+        my_url = ""
+        for _env_var in ("RAILWAY_PUBLIC_DOMAIN", "RAILWAY_STATIC_URL",
+                         "RENDER_EXTERNAL_URL", "PUBLIC_URL"):
+            val = os.environ.get(_env_var, "")
+            if val:
+                my_url = val
+                break
+        if my_url and not my_url.startswith("http"):
             my_url = f"https://{my_url}"
-        else:
+        if not my_url:
             my_url = f"http://localhost:{PORT}"
+            print(f"  [!] No se detecto URL publica de Railway -- "
+                  f"registrando con {my_url} (Meta-Orquestador no podra "
+                  f"consultar este agente). Configurar manualmente la "
+                  f"variable AGENT_PUBLIC_URL en Railway si esto persiste.")
+        # Override manual explicito, por si ninguna de las anteriores aplica
+        my_url = os.environ.get("AGENT_PUBLIC_URL", my_url)
 
         payload = json.dumps({
             "agent_id":    AGENT_ID,
